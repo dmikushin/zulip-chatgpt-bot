@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 import tiktoken
 import sqlite3
 import datetime
+import contexts
 
 # Load the .env file
 load_dotenv()
@@ -16,10 +17,7 @@ load_dotenv()
 LOGLEVEL = os.environ.get('LOGLEVEL', 'INFO').upper()
 logging.basicConfig(level=LOGLEVEL)
 
-if not os.path.exists('data'):
-    os.makedir('data')
-conn = sqlite3.connect('data/data.db')
-cur = conn.cursor()
+contexts = contexts.Contexts()
 
 # Set up GPT-3 API key
 openai.api_key = os.environ['OPENAI_API_KEY']
@@ -31,8 +29,6 @@ PERMISSIONS_SET_CONTEXT = os.environ['PERMISSIONS_SET_CONTEXT']
 DEFAULT_MODEL_NAME = os.environ['DEFAULT_MODEL_NAME']
 BOT_NAME = os.environ['BOT_NAME']
 VERSION = "1.1.3"
-
-contexts = {}
 
 
 def num_tokens_from_messages(messages, model="gpt-3.5-turbo"):
@@ -221,30 +217,6 @@ def is_admin(client, msg):
     return member.get("user", {}).get("is_admin")
 
 
-def upsert_context(context_name, context_value):
-    context_exists = cur.execute(
-        "SELECT * FROM contexts WHERE name = ?", (context_name,)).fetchone()
-    if context_exists:
-        cur.execute("UPDATE contexts SET value = ? WHERE name = ?",
-                    (context_value, context_name))
-    else:
-        cur.execute("INSERT INTO contexts (name, value) VALUES (?, ?)",
-                    (context_name, context_value))
-    conn.commit()
-    refetch_contexts()
-
-
-def delete_context(context_name):
-    cur.execute("DELETE FROM contexts WHERE name = ?", (context_name,))
-    conn.commit()
-    refetch_contexts()
-
-
-def refetch_contexts():
-    global contexts
-    contexts = cur.execute("SELECT * FROM contexts").fetchall()
-
-
 def process_set_subcommands(client, msg, messages, subcommands, content):
     content_chunks = content.strip().split()
     command = content_chunks[0].lower()
@@ -255,15 +227,11 @@ def process_set_subcommands(client, msg, messages, subcommands, content):
 
         context_name = content_chunks[1].lower()
 
-        disabled_contexts = ["topic", "stream", "new", "help",
-                             "contexts", "gpt3", "gpt4", "set", "unset", "me", "admin", "stats"]
-        if context_name in disabled_contexts:
-            send_reply(f"Sorry, you can't set context for {context_name}", msg)
-            return
-
         context_value = " ".join(content_chunks[2:])
-        upsert_context(context_name, context_value)
-        send_reply(f"I have set !{context_name} to: {context_value}", msg)
+        if contexts.upsert(context_name, context_value):
+            send_reply(f"I have set !{context_name} to: {context_value}", msg)
+        else:
+            send_reply(f"Sorry, you can't set context for {context_name}", msg)
 
 
 def process_unset_subcommands(client, msg, messages, subcommands, content):
@@ -275,13 +243,11 @@ def process_unset_subcommands(client, msg, messages, subcommands, content):
             return
 
         context_name = content_chunks[1].lower()
-        delete_context(context_name)
+        contexts.delete(context_name)
         send_reply(f"I have unset !{context_name}", msg)
 
 
 def handle_message(event):
-    global contexts
-
     logging.debug("Handling event type: {type}".format(type=event['type']))
 
     if event['type'] != 'message':
@@ -385,11 +351,8 @@ def handle_message(event):
 
 
 def main():
-    global contexts
     logging.info("Initiate DB...")
-    cur.execute("CREATE TABLE IF NOT EXISTS contexts(name PRIMARY KEY, value)")
 
-    refetch_contexts()
     logging.info("Contexts")
     logging.info(contexts)
 
