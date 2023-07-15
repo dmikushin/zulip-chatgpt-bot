@@ -26,8 +26,8 @@ class Subcommands:
             str(current_time), str(msg['sender_email']), ", ".join(subcommands), content)
 
     def __iter__(self):
-         for subcommand in self._subcommands:
-             yield context
+        for subcommand in self._subcommands:
+            yield context
 
 
     def strip(self, content):

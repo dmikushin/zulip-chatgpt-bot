@@ -153,3 +153,13 @@ docker build -t zulip-chatgpt-bot .
 docker-compose up -d 
 ```
 
+## Code quality guidelines
+
+Please use `pylint` to eliminate the obvious code quality issues:
+
+```
+python3 -m venv env
+source env/bin/activate.fish
+pip install pylint
+pylint *.py
+```

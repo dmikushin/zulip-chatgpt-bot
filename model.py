@@ -1,6 +1,14 @@
-class Model:
+"""
+This module implements class for OpenAI interaction via their API.
+"""
+import logging
+import openai
 
-    def __init(self, model_name):
+class Model:
+    """
+    This class implements OpenAI interaction via their API.
+    """
+    def __init__(self, model_name):
         model_tokens = {
             # input limit for GPT-3.5 Turbo (context 4k, prompt 2.5k, response 1.5k)
             'gpt-3.5-turbo': 2500,
@@ -14,6 +22,9 @@ class Model:
         self.token_limit = model_tokens[model_name]
 
     def get_response(self, messages, model_name):
+        """
+        Get response from GPT
+        """
         try:
             response = openai.ChatCompletion.create(
                 model=model_name,
@@ -24,4 +35,3 @@ class Model:
         except Exception as e:
             logging.error(e)
             return "OpenAI API error. Please try again later."
-
